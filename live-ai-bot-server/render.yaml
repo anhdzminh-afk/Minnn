@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: live-ai-bot-readonly
+    runtime: node
+    rootDir: live-ai-bot-server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: TIKTOK_ROOM
+        sync: false
