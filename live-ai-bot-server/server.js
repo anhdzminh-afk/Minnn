@@ -1,31 +1,9 @@
 import express from 'express';
-import { WebcastPushConnection } from 'tiktok-live-connector';
 const app=express();
 app.disable('x-powered-by');
 const port=Number(process.env.PORT||3000);
-const room=(process.env.TIKTOK_ROOM||'').replace(/^@/,'').trim();
-const listeners=new Set();
-let status='disconnected', error='', client, connecting=false, blockedUntil=0;
-function send(obj){const line='data: '+JSON.stringify(obj)+'\n\n';for(const res of listeners){try{res.write(line)}catch{listeners.delete(res)}}}
-app.get('/health',(_req,res)=>res.json({status,room:room?'configured':'missing',error}));
-app.get('/events',(req,res)=>{
- res.setHeader('Content-Type','text/event-stream');
- res.setHeader('Cache-Control','no-cache');
- res.setHeader('Connection','keep-alive');
- res.flushHeaders();
- listeners.add(res);
- res.write('data: '+JSON.stringify({type:'status',status})+'\n\n');
- const timer=setInterval(()=>res.write(': keepalive\n\n'),25000);
- req.on('close',()=>{clearInterval(timer);listeners.delete(res)});
-});
-app.get('/',(_req,res)=>res.type('text').send('LIVE AI BOT server: read-only TikTok LIVE monitor. /health /events'));
-if(room){
- client=new WebcastPushConnection(room);
- client.on('chat',data=>send({type:'chat',user:data.uniqueId||'',nickname:data.nickname||'',text:data.comment||'',timestamp:Date.now()}));
- client.on('streamEnd',()=>{status='ended';send({type:'status',status})});
- client.on('disconnected',()=>{status='disconnected';send({type:'status',status})});
- const connect=async()=>{if(connecting||Date.now()<blockedUntil)return;connecting=true;try{await client.connect();status='connected';error='';send({type:'status',status})}catch(e){const message=String(e?.message||e);const denied=/403|Forbidden|signature|ký yêu cầu/i.test(message);status=denied?'access_denied':'error';error=denied?'TikTok refused the request (HTTP 403). Unofficial connector access is not authorized or available; check supported access.':message.slice(0,250);blockedUntil=Date.now()+(denied?30*60*1000:60*1000);send({type:'status',status,error})}finally{connecting=false}};
- connect();
- setInterval(()=>{if(status!=='connected')connect()},60000);
-}
-app.listen(port,'0.0.0.0',()=>console.log('Listening on '+port));
+const room=(process.env.TIKTOK_ROOM||'orz.lumina8386').replace(/^@/,'').trim();
+app.use(express.json({limit:'8kb'}));
+app.get('/health',(_req,res)=>res.json({status:'manual_assistant',room,connected:false,autoPost:false,message:'TikTok LIVE read/post unavailable: previous connector returned HTTP 403.'}));
+app.get('/',(_req,res)=>res.type('html').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LIVE AI BOT</title><style>body{font:16px system-ui;background:#111827;color:white;margin:0;padding:20px}main{max-width:540px;margin:auto}textarea,button{box-sizing:border-box;width:100%;padding:14px;margin:8px 0;border-radius:12px;font:inherit}textarea{height:110px}button{border:0;background:#22c6a7;color:#071b17}section{background:#253145;padding:18px;border-radius:16px}small{color:#ddd}</style></head><body><main><h2>LIVE AI BOT — @${room.replace(/[^a-zA-Z0-9._]/g,'')}</h2><section><p>Chế độ hỗ trợ soạn bình luận. <strong>Chưa kết nối TikTok LIVE thật và không tự đăng.</strong></p><label>Nhập nội dung bình luận bạn muốn trả lời</label><textarea id="input" placeholder="Dán bình luận vào đây"></textarea><button id="draft">Gợi ý câu trả lời</button><textarea id="output" readonly placeholder="Câu trả lời sẽ xuất hiện ở đây"></textarea><button id="copy">Sao chép câu trả lời</button><small>Không nhập mật khẩu, cookie hoặc mã xác thực TikTok. Gợi ý là mẫu câu, chưa dùng mô hình AI bên ngoài.</small></section></main><script>document.getElementById('draft').onclick=()=>{const s=document.getElementById('input').value.trim().slice(0,250);document.getElementById('output').value=s?'Cảm ơn bạn đã chia sẻ! Mình rất quan tâm đến ý này: '+s:'Chào mọi người! Chúc buổi LIVE thật vui vẻ nhé!'};document.getElementById('copy').onclick=()=>navigator.clipboard?.writeText(document.getElementById('output').value);</script></body></html>`);
+app.listen(port,'0.0.0.0',()=>console.log('LIVE AI BOT manual assistant listening on '+port));
